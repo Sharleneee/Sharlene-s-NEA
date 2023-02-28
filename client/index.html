@@ -6,54 +6,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
     <title>Home Page</title>
-    <script src="index.js"></script>
+    
 </head>
 <body>
     <h1 id="pageTitle">Libbl</h1>
     <form id="enterDetails">
     <div>
         <div>
-            <input type="text" id="name" placeholder="Enter your name...">
+            <input type="text" id="nameBox" placeholder="Enter your name...">
         </div>
 
         <div id="customiseIcon" width="1000px">
             <div class="leftButtons">
                 <button type="button" id="leftEyesButton" onclick="leftEyes()">
-                    <img class="toolIcon" src="images/leftArrow.png" alt="left arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/leftArrow.png" alt="left arrow icon">
                 </button>
 
                 <button type="button" id="leftMouthButton" onclick="leftMouth()">
-                    <img class="toolIcon" src="images/leftArrow.png" alt="left arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/leftArrow.png" alt="left arrow icon">
                 </button>
 
                 <button type="button" id="leftBodyButton" onclick="leftBody()">
-                    <img class="toolIcon" src="images/leftArrow.png" alt="left arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/leftArrow.png" alt="left arrow icon">
                 </button>
                 
             </div>
 
-            <div class="iconPart" height="200px" width="200px">
-                <img id="bodyStyle" src="images/body_1.png" alt="body of icon" height="170px" width="230px">
-                <img id="eyeStyle" src="images/eyes_1.png" alt="eyes of icon" height="70px" width="140px"> <!--will add images later and functions to change images when arrows clicked-->
-                <img id="mouthStyle" src="images/mouth_1.png" alt="mouth of icon" height="30px" width="60px">
+            <div class="iconPart" height="250px" width="250px">
+                <img id="bodyStyle" src="https://d2lawzz4zy243q.cloudfront.net/body_1.png" alt="body of icon" height="170px" width="230px">
+                <img id="eyeStyle" src="https://d2lawzz4zy243q.cloudfront.net/eyes_1.png" alt="eyes of icon" height="70px" width="140px"> 
+                <img id="mouthStyle" src="https://d2lawzz4zy243q.cloudfront.net/mouth_1.png" alt="mouth of icon" height="30px" width="60px">
                 
-
             </div>
             
             <div class="rightButtons">
                 <button type="button" id="rightEyesButton" onclick="rightEyes()">
-                    <img class="toolIcon" src="images/rightArrow.png" alt="right arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/rightArrow.png" alt="right arrow icon">
         
                 </button>
 
                 
                 <button type="button" id="rightMouthButton" onclick="rightMouth()">
-                    <img class="toolIcon" src="images/rightArrow.png" alt="right arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/rightArrow.png" alt="right arrow icon">
         
                 </button>
 
                 <button type="button" id="rightBodyButton" onclick="rightBody()">
-                    <img class="toolIcon" src="images/rightArrow.png" alt="right arrow icon">
+                    <img class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/rightArrow.png" alt="right arrow icon">
         
                 </button>
 
@@ -72,8 +71,8 @@
             <a id="playButton" class="homepageButtons" href="gamepage.html">Play</a>
             <a href="lobby.html" target="_self" id="privateGameButton" class="homepageButtons">Create Private Game</a>-->
                         
-            <input id="joinwithCodeBox" type="text" placeholder="Have a join code? Enter here...">
-            <button id="joinWithCodeButton" onclick="joinWithCode()" enterkeyhint="send"> > </button>
+            <input id="joinWithCodeBox" type="text" placeholder="Have a join code? Enter here...">
+            <button id="joinWithCodeButton" onclick="joinWithCode()"> > </button>
         </div>
         
     </div>
@@ -92,7 +91,6 @@
         <p id="howToPlay">One person is picked as the drawer and they must choose one of three words to draw. The other players should guess. The fastest guesser and best drawer wins!</p>
 
     </div>
-
-
+    <script src="index.js"></script>
 </body>
 </html>
