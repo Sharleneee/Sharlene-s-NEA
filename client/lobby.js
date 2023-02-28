@@ -111,6 +111,9 @@ function getUseCustomWords() {
 
 function getListWordsAdded() {
     const wordsString = document.getElementById("listWordsAdded").value;
+    if(wordsString === ""){
+        return [];
+    }
     const listWords = wordsString.split(",");
     for(let i=0; i<listWords.length; i++){
         listWords[i] = listWords[i].trim();
