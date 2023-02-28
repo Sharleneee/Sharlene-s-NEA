@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lobby</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="lobby.js"></script>
+    
 </head>
-<body>
+<body onbeforeunload="return leavePage()">
     <div id="menu">
         <a href="index.html">Home</a>
     </div>
@@ -56,22 +56,29 @@
                 </select>
             </div>
 
-            <div class="settings">
-                <label for="useCustomWords">Only use custom words.</label>
+            <div class="settings" id="customWordsDiv">
+                <label id="useCustomWordsLabel" for="useCustomWords">Only use custom words.</label>
                 <input type="checkbox" id="useCustomWords" name="useCustom" oninput="changeUseCustomWords()">
 
             </div>
 
             <div class="settings">
-                <button id="startGameButton" onclick="getSettings()" href="gamepage.html">Start Game</button>
+                <button id="startGameButton" onclick="startGame()" href="gamepage.html">Start Game</button>
             </div>
 
         </form>
     </div>
 
+    <div id="gameCodeBox">
+        <p>Share this game code to play with friends: </p>
+        <p id="gameCode"></p>
+    </div>
+
     <div id="playersDisplay">
         <h2 class="lobbyTitles">Players</h2>
+        
+        
     </div>
-    
+    <script src="lobby.js"></script>
 </body>
 </html>
