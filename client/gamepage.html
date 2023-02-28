@@ -15,7 +15,8 @@
     <div id="leaderboard"></div>
 
     <div id="gameInfo">
-
+        <p>Seconds left: </p>
+        <p id="countdown"></p>
 
     </div>
     <div class="flex-page">
@@ -24,154 +25,42 @@
     <div id="canvasContainer">
     
         <canvas id="canvas" style="border:1px solid #000000;">
-        <script>
-            let canvasHeight = 500;
-            let canvasWidth = 500;
-            let c = document.getElementById("canvas");
-            c.height = canvasHeight;
-            c.width = canvasWidth;
-            let ctx = c.getContext("2d");
-            
-
-            let buttonSelected = "paintbrush";
-            let penColour = "#000000"; // for eraser too, colour would be white for eraser
-            let penSize = 20;
-
-            /* not needed - can delete later
-            ctx.strokeStyle = "#FF0000";
-            ctx.beginPath();
-            
-            ctx.moveTo(10,10);
-            ctx.lineTo(10,11);
-            ctx.stroke();
-    
-            
-            ctx.beginPath();
-            ctx.arc(20,20,0.5,0,2*Math.PI);
-            ctx.fill();
-            */
-
-    
-            /*function f(){
-                let x = event.pageX;
-                let y = event.pageY;
-                let coor = "X coords: " + x + ", Y coords: " + y;
-                console.log(coor);
-                ctx.beginPath(); 
-            };*/
-    
-            function setPaintbrush() {
-                buttonSelected = "paintbrush";
-            }
-
-            function setEraser() {
-                buttonSelected = "eraser";
-            }
-
-            function setColour(colour) {
-                buttonSelected = "paintbrush";
-                penColour = colour;
-            }
-
-            function sliding(x) {
-                penSize = x;
-            }
-
-            function clearCanvas() {
-                c.height = canvasHeight;
-            }
-
-            function fill() {
-                
-            }
-
-            function undo() {
-
-            }
-
-            function redo() {
-
-            }
-    
-            c.addEventListener("mousedown", function draw(event){
-                let x = event.clientX - c.offsetLeft; // offset makes it so that the line drawn is from where the mouse pointer is because without this, the line is offset
-                let y = event.clientY - c.offsetTop;
-
-                ctx.lineWidth = penSize;
-                
-                if(buttonSelected==="paintbrush"){
-                    ctx.strokeStyle = penColour; 
-
-                    ctx.beginPath();
-                    ctx.arc(x,y,0.5 * penSize,0,2*Math.PI);
-                    ctx.fill();
-
-                    ctx.strokeStyle = penColour;
-
-                    ctx.beginPath();
-                    ctx.moveTo(x,y);
-                }
-                else if(buttonSelected==="eraser"){
-                    ctx.strokeStyle = "#FFFFFF";
-
-                    ctx.beginPath();  // exact same as the above
-                    ctx.arc(x,y,0.5,0,2*Math.PI);
-                    ctx.fill();
-
-                    ctx.strokeStyle = "#FFFFFF";
-
-                    ctx.beginPath();
-                    ctx.moveTo(x,y);
-                }
-            });
-    
-            c.addEventListener("mousemove", function move(event){
-                if(event.buttons === 1){
-                    x = event.clientX - c.offsetLeft;
-                    y = event.clientY - c.offsetTop;
-                    ctx.lineTo(x,y);
-                    ctx.stroke();
-                }
-            })
-    
-           
-            
-        </script>
+       
         </canvas>
 
     <div id="toolbox">
         <button type="button" onclick="setPaintbrush()">
-            <img id="paintbrush" class="toolIcon" src="images/paintbrush.png" alt="paintbrush icon">
+            <img id="paintbrush" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/paintbrush.png" alt="paintbrush icon">
 
         </button>
 
         <button type="button" onclick="setEraser()">
-            <img id="eraser" class="toolIcon" src="images/eraser.png" alt="eraser icon">
+            <img id="eraser" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/eraser.png" alt="eraser icon">
 
         </button>
 
         <button type="button" onclick="clearCanvas()">
-            <img id="clear" class="toolIcon" src="images/clear.png" alt="clear screen icon">
+            <img id="clear" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/clear.png" alt="clear screen icon">
 
         </button>
 
         <button type="button" onclick="fill()"> <!--no functionality yet-->
-            <img id="fill" class="toolIcon" src="images/fill.png" alt="fill icon">
+            <img id="fill" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/fill.png" alt="fill icon">
 
         </button>
 
         <button type="button" onclick="undo()">
-            <img id="undo" class="toolIcon" src="images/undo.png" alt="undo icon">
+            <img id="undo" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/undo.png" alt="undo icon">
 
         </button>
 
         <button type="button" onclick="redo()">
-            <img id="redo" class="toolIcon" src="images/redo.png" alt="redo icon">
+            <img id="redo" class="toolIcon" src="https://d2lawzz4zy243q.cloudfront.net/redo.png" alt="redo icon">
 
         </button>
 
         <div id="colourBox">
-            <div id="currentColour" class="box">
+            <div id="currentColour" class="box" style="background-color: black;">
 
             </div>
 
@@ -219,6 +108,7 @@
             <button type="button" onclick="setColour(this.value)" value="brown" class="box brown">
 
             </button>
+            <input type="color" oninput="setColour(this.value)" onchange="setColour(this.value)" value="#000000">
 
 
             <!--<script>
@@ -252,74 +142,15 @@
             <p>msg</p>
         </div>-->
         
-        
         <div>
             <input id="messageBox" type="text" placeholder="Guess or message your friends...">
             <button id="sendButton" onclick="sendMessageToServer()" enterkeyhint="send"> > </button>
 
         </div>
     </div>
-        <script>
-            let ws = new WebSocket("ws://localhost:8080");
-
-            ws.onmessage = message => console.log(`We received a message from server ${message.data}`);
-
-            ws.addEventListener("message", function(event){ // for when receiving messages from server
-                const messageFromServer = JSON.parse(event.data);
-                if(messageFromServer.method === "message"){
-                    displayMessage(messageFromServer.messageContent);
-                    console.log(messageFromServer.messageContent); //temporary
-                }
-            });
-
-            document.getElementById("messageBox").addEventListener("keypress", function(){
-                if(event.key === "Enter"){ // clicking enter also presses button
-                    document.getElementById("sendButton").click();
-                }
-            });
-
-            function sendMessageToServer(){ // called when send message button is clicked
-                const messageBox = document.getElementById("messageBox");
-                const message = messageBox.value;
-
-                if(message === ""){
-                    alert("Error. Cannot send empty messages.");
-                }
-                else{
-                    ws.send(JSON.stringify({
-                        method: "message",
-                        messageContent: message
-                    }));
-                    displayMessage(message);
-                    messageBox.value = "";
-                }
-            }
-
-            function displayMessage(message){ 
-                const chat = document.getElementById("chat");
-
-                const newDivElement = document.createElement("div");
-                newDivElement.style.backgroundColor = "#a7d1ac";
-                newDivElement.style.outlineColor = "#2b8235";
-                newDivElement.style.outlineStyle = "solid";
-                newDivElement.style.outlineWidth = "1px";
-                newDivElement.style.borderRadius = "2px";
-                newDivElement.style.margin = "6px";
-
-                // for css : message.style.marginTop = "4px";
-                // for css : sendButton.style.marginTop = "4px";
-
-                const newPElement = document.createElement("p"); //making a new paragraph element
-                newPElement.style.margin = "2px";
-
-                const node = document.createTextNode(message); 
-                newPElement.appendChild(node); // inserting the text into the paragraph element
-                newDivElement.appendChild(newPElement); // inserting the paragraph into the new div element
-                chat.appendChild(newDivElement); // inserting the div element into the chat div
-            }
-            
-        </script>  
+       
     </div>
     </div>
+    <script src="gamepage.js"></script>
 </body>
 </html>
