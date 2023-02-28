@@ -19,13 +19,23 @@ ws.onmessage = message => {
         if (ws.readyState === 1) {
             // this method requests to update this client's information on the server
             ws.send(JSON.stringify({
-                method: "updateClientID",
+                method: "updateClientIDGamepage",
                 gameID: gameID,
                 oldClientID: oldClientID,
                 clientID: clientID
             }));
         }
 
+    }
+
+    if(msg.method === "initialiseGame"){
+        gameSettings = msg.gameSettings; // only has numRounds and roundLength
+        if(msg.isDrawer === true){
+            initialiseDrawer(msg.threeWords);
+        }
+        else{
+            initialiseGuesser();
+        }
     }
 
     if (msg.method === "message") {
@@ -108,29 +118,62 @@ function updateCountdown(end){
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////
+function createInfoBoard(text){
+    const newDiv = document.createElement("div");
+    newDiv.setAttribute("class", "stackTop");
+    newDiv.setAttribute("id", "infoBoard");
+    newDiv.innerHTML = text;
 
-//initalising variables
-if(isHost){ // change to isDrawer after testing
-    if(ws.readyState === 1){
-        ws.send(JSON.stringify({
-            method: "choose3Words",
-            clientID: clientID,
-            gameID: gameID
-        }))
+    cContainer.appendChild(newDiv);
+}
+
+function add3buttons(threeWords, element){
+    for(let i=0; i<3; i++){
+        const newButton = document.createElement("button");
+        newButton.innerHTML = threeWords[i];
+        newButton.addEventListener("click", function(){
+            if(ws.readyState === 1){
+                ws.send(JSON.stringify({
+                    method: "chooseWord",
+                    wordChosen: document.newButton.innerHTML,
+                    gameID: gameID
+                }))
+            }
+        });
+        element.appendChild(newButton);
     }
 }
 
 
 /////////////////////////////////////////////////////////////////////////////////
 
-let canvasHeight = 500;
-let canvasWidth = 500;
-let c = document.getElementById("canvas");
+const canvasHeight = 500;
+const canvasWidth = 500;
+const c = document.getElementById("canvas");
+const cContainer = document.getElementById("canvasContainer")
 c.height = canvasHeight;
 c.width = canvasWidth;
-let ctx = c.getContext("2d");
+const ctx = c.getContext("2d");
 
+
+/////////////////////////////////////////////////////////////////////////////
+
+//initalising variables
+function initialiseDrawer(threeWords){
+    createInfoBoard("Choose a word to draw...");
+    add3buttons(threeWords, document.getElementById("infoBoard"));
+}
+
+// makes all the drawing tools hidden and makes a screen show up saying the drawer is choosing a word
+function initialiseGuesser(){
+    const tools = document.getElementById("toolbox").childNodes;
+    for(let i=0; i<tools.length; i++){
+        tools[i].hidden = true;
+    }
+
+    createInfoBoard("Drawer is choosing word...");
+    
+}
 
 let buttonSelected = "paintbrush";
 let penColour = "#000000"; // for eraser too, colour would be white for eraser
