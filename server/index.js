@@ -161,6 +161,43 @@ wss.on("request", request => {
             removeClientFromClients(oldClientID);
         }
 
+        if (messageFromClient.method === "updateClientIDGamepage") {
+            const clientID = messageFromClient.clientID;
+            const oldClientID = messageFromClient.oldClientID;
+            const gameID = messageFromClient.gameID;
+            let isDrawer = false;
+            let threeWords = [];
+
+            let client = games[gameID].clients.find(eachClient => eachClient.clientID === oldClientID);
+            //changing the client's clientID from the old one to the new one
+            client.clientID = clientID;
+            removeClientFromClients(oldClientID);
+
+            //changing the clientID of the corresponding client in playersInLobby list
+
+            client = games[gameID].playersInLobby.find(eachPlayer => eachPlayer.clientID === oldClientID);
+            client.clientID = clientID;
+
+            // sends messsage to initialise game after client's clientID updated
+            // assuming all players in lobby continue to gamepage
+
+            if (games[gameID].playersInLobby[0].clientID === clientID) {
+                isDrawer = true;
+                threeWords = genThreeWords(gameID, games[gameID].gameSettings.listWordsAdded);
+            }
+
+            clients[clientID].connection.send(JSON.stringify({
+                method: "initialiseGame",
+                gameSettings: {
+                    numRounds: games[gameID].gameSettings.numRounds,
+                    roundLength: games[gameID].gameSettings.roundLength,
+                },
+                isDrawer: isDrawer,
+                threeWords: threeWords
+
+            }));
+        }
+
         if (messageFromClient.method === "updatePlayersInLobby") {
 
             const game = games[messageFromClient.gameID];
@@ -256,7 +293,7 @@ wss.on("request", request => {
                 const client = clients[eachClient.clientID];
                 const readyToStart = (numPlayersInLobby === games[gameID].clients.length) && (games[gameID].clients.length > 1);
                 client.connection.send(JSON.stringify({
-                    method:"startGame",
+                    method: "startGame",
                     readyToStart: readyToStart,
                     reason: "Cannot start game as either everyone has not joined lobby yet or there is not enough people to start the game (>1)."
                 }));
@@ -268,34 +305,13 @@ wss.on("request", request => {
         /////////////////////////////////////////////////////////////////////////////////////
 
 
-        if(messageFromClient.method === "choose3Words"){
-            const gameID = messageFromClient.gameID;
-            const clientID = messageFromClient.clientID;
-            const threeWords = [];
-            
-            if(games[gameID].gameSettings.useCustomWords){
-                const listWordsAdded = games[gameID].gameSettings.listWordsAdded;
-                
-                for(let i=0; i<3; i++){
-                    const wordGenerated = getRandomWord(listWordsAdded, listWordsAdded.length);
-                    if(!(wordInList(wordGenerated, threeWords))){
-                        threeWords.push(wordGenerated);
-                    }
-                }
-            }
-            else{
-                for(let i=0; i<3; i++){
-                    const wordGenerated = getRandomWord([], 0);
-                    if(!(wordInList(wordGenerated, threeWords))){
-                        threeWords.push(wordGenerated);
-                    }
-                }
-            }
+        if (messageFromClient.method === "choose3Words") {
 
-            
+
+
         }
 
-        if(messageFromClient.method === "message"){
+        if (messageFromClient.method === "message") {
             const gameID = messageFromClient.gameID;
             const clientID = messageFromClient.clientID;
             games[gameID].clients.forEach(eachClient => {
@@ -332,24 +348,42 @@ wss.on("request", request => {
 
 ////////// GAMEPAGE ////////////////////////
 
-function getRandomWord(listWordsAdded, numWordsAdded){
+function getRandomWord(listWordsAdded, numWordsAdded) {
     //generate a random number from 
     const max = 75 + numWordsAdded;
     //get random number exclusive of max
-    const index = Math.floor(Math.random() * max); 
-    if(index <= 74){
+    const index = Math.floor(Math.random() * max);
+    if (index <= 74) {
         return words[index];
     }
-    else{
-        return listWordsAdded[index-75];
+    else {
+        return listWordsAdded[index - 75];
     }
 }
 
-function wordInList(word, wordList){
+function wordInList(word, wordList) {
     wordList.forEach(x => {
-        if(word === x){
+        if (word === x) {
             return true;
         }
     })
     return false;
 }
+
+function genThreeWords(gameID, listWordsAdded) {
+    //listWordsAdded can be empty
+    const threeWords = [];
+
+    for (let i = 0; i < 3; i++) {
+        const wordGenerated = getRandomWord(listWordsAdded, listWordsAdded.length);
+        if (!(wordInList(wordGenerated, threeWords))) {
+            threeWords.push(wordGenerated);
+        }
+        // repeat until 3 words can be pushed into threeWords list
+        else{
+            i -= 1;
+        }
+    }
+    return threeWords;
+}
+
