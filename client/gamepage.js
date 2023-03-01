@@ -119,12 +119,17 @@ function updateCountdown(end){
 }
 
 function createInfoBoard(text){
+    /*
     const newDiv = document.createElement("div");
     newDiv.setAttribute("class", "stackTop");
     newDiv.setAttribute("id", "infoBoard");
     newDiv.innerHTML = text;
 
     cContainer.appendChild(newDiv);
+    */
+    ctx.font = "30px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(text, canvasWidth/2, canvasHeight/2);
 }
 
 function add3buttons(threeWords, element){
@@ -135,9 +140,9 @@ function add3buttons(threeWords, element){
             if(ws.readyState === 1){
                 ws.send(JSON.stringify({
                     method: "chooseWord",
-                    wordChosen: document.newButton.innerHTML,
+                    wordChosen: newButton.innerHTML,
                     gameID: gameID
-                }))
+                }));
             }
         });
         element.appendChild(newButton);
@@ -161,7 +166,14 @@ const ctx = c.getContext("2d");
 //initalising variables
 function initialiseDrawer(threeWords){
     createInfoBoard("Choose a word to draw...");
-    add3buttons(threeWords, document.getElementById("infoBoard"));
+
+    //creating div to place words in 
+
+    const newDiv = document.createElement("div");
+    cContainer.after(newDiv);
+
+    add3buttons(threeWords, newDiv);
+    //add3buttons(threeWords, document.getElementById("infoBoard"));
 }
 
 // makes all the drawing tools hidden and makes a screen show up saying the drawer is choosing a word
