@@ -80,7 +80,8 @@ else{
     document.getElementById("customWordsDiv").appendChild(node);
 }
 
-function leavePage(){
+/* this functionality doesn't fully work 
+function exitGame(){
     if(ws.readyState === 1){
         ws.send(JSON.stringify({
             method: "updatePlayersInLobby",
@@ -89,8 +90,20 @@ function leavePage(){
             clientID: clientID
         }));
     }
-    return "You are leaving the page.";
+    sessionStorage.clear();
+    //window.location.href = "index.html";
 }
+document.getElementById("exitGameButton").addEventListener("click", exitGame());
+*/
+
+// stops clients from leaving page using any other way than the exit game button on the page
+/* 
+function cancelLeavePage(){
+    window.onbeforeunload = null;
+    return "";
+    
+}
+*/
 
 /*
 let numRounds = 0;
