@@ -64,12 +64,17 @@ wss.on("request", request => {
         }
         const messageFromClient = JSON.parse(message.utf8Data);
 
-        if (messageFromClient.method === "message") {  // if the data received is a message,
-            clients.forEach(eachClient => { // it will be sent to all the clients apart from the one that sent it
-                if (eachClient.connection !== connection) { //ready state is 1 when a socket is OPEN and ready to communicate
-                    eachClient.send(JSON.stringify({
+        // if the data received is a message,
+        if (messageFromClient.method === "message") {  
+            const gameID = messageFromClient.gameID;   
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => { // it will be sent to all the clients apart from the one that sent it
+                const client = clients[eachClient.clientID];
+                if (client.connection !== clients[clientID].connection) { 
+                    client.connection.send(JSON.stringify({
                         type: "message",
-                        messageContent: "message from server it was sent"//messageFromClient.messageContent
+                        messageContent: messageFromClient.messageContent
                     }));
                 }
             })
@@ -90,7 +95,8 @@ wss.on("request", request => {
             }
             games[gameID] = {
                 gameID: gameID,
-                clients: [client] // adds host to clients list when made
+                clients: [client], // adds host to clients list when made
+                gameStarted: false
             }
             const con = clients[messageFromClient.clientID].connection;
             const state = con.socket.connecting;
@@ -156,7 +162,7 @@ wss.on("request", request => {
             const gameID = messageFromClient.gameID;
 
             const client = games[gameID].clients.find(eachClient => eachClient.clientID === oldClientID);
-            //changing the client's clientID from the old one to the new one
+            //changing the client's clientID from the old one to the new one in games array
             client.clientID = clientID;
             removeClientFromClients(oldClientID);
         }
@@ -173,10 +179,7 @@ wss.on("request", request => {
             client.clientID = clientID;
             removeClientFromClients(oldClientID);
 
-            //changing the clientID of the corresponding client in playersInLobby list
-
-            client = games[gameID].playersInLobby.find(eachPlayer => eachPlayer.clientID === oldClientID);
-            client.clientID = clientID;
+            //dont need to change the clientID of the corresponding client in playersInLobby list as it is automatically changed due to it being passed as reference from the games array, so it changes when game object changes
 
             // sends messsage to initialise game after client's clientID updated
             // assuming all players in lobby continue to gamepage
@@ -214,12 +217,15 @@ wss.on("request", request => {
 
             }
             else if (messageFromClient.event === "exit") {
+                if(games[gameID].gameStarted){
+                    return;
+                }
                 //assuming exit method is only used when there are more than 0 players in playersInLobby list.
                 const indexInPlayersList = games[gameID].playersInLobby.findIndex(x => x.clientID === clientID); //returns undefined if not found
                 //deleting client from players list:
                 games[gameID].playersInLobby.splice(indexInPlayersList, 1);
                 //deleting client from game clients list:
-                //removeClientFromGame(gameID, clientID); this causes problems later
+                removeClientFromGame(gameID, clientID); 
 
             }
             // sends the updated playersInLobby list to everyon
@@ -278,6 +284,8 @@ wss.on("request", request => {
 
         if (messageFromClient.method === "startGame") {
             const gameID = messageFromClient.gameID;
+            //this is to stop updatePlayersInLobby from removing players from the game and list
+            games[gameID].gameStarted = true;
 
             // adding a game settings object to the game
             games[messageFromClient.gameID].gameSettings = {
@@ -291,11 +299,11 @@ wss.on("request", request => {
             games[gameID].clients.forEach(eachClient => {
                 const numPlayersInLobby = games[gameID].playersInLobby.length; // when people leave, this number goes down so the last person isn't able to "play the game" so I am assigning it to a const
                 const client = clients[eachClient.clientID];
-                const readyToStart = (numPlayersInLobby === games[gameID].clients.length) && (games[gameID].clients.length > 1);
+                const readyToStart = games[gameID].clients.length > 1;
                 client.connection.send(JSON.stringify({
                     method: "startGame",
                     readyToStart: readyToStart,
-                    reason: "Cannot start game as either everyone has not joined lobby yet or there is not enough people to start the game (>1)."
+                    reason: "Cannot start game as there is not enough people to start the game (need more than one player)."
                 }));
             })
 
