@@ -286,6 +286,7 @@ wss.on("request", request => {
 
 
         if (messageFromClient.method === "wordChosen") {
+            clearInterval(clock);
             const gameID = messageFromClient.gameID;
             const wordChosen = messageFromClient.wordChosen;
 
@@ -294,8 +295,11 @@ wss.on("request", request => {
                 wordChosen = games[gameID].threeWords[0];
             }
             games[gameID].wordChosen = wordChosen;
-            startPlaying();
+            startPlaying(gameID, clientID);
         }
+
+
+
         /*
         
         if(messageFromClient.method === "checkIfRoundOver"){
@@ -310,14 +314,34 @@ wss.on("request", request => {
             const clientID = messageFromClient.clientID;
             const messageSentBy = games[gameID].clients.find(eachClient => eachClient.clientID === clientID).playerName;
 
-            games[gameID].clients.forEach(eachClient => { // it will be sent to all the clients apart from the one that sent it
-                const client = clients[eachClient.clientID];
-                client.connection.send(JSON.stringify({
-                    method: "message",
-                    messageSentBy: messageSentBy,
-                    messageContent: messageFromClient.messageContent
-                }));
-            })
+            let isCorrectGuess = false;
+
+            if (games[gameID].isGuessing) {
+                isCorrectGuess = checkIfCorrectGuess(messageFromClient.messageContent);
+            }
+
+            if (isCorrectGuess) {
+                //checking if player is already in guessed correctly list
+                if ((games[gameID].playersGuessedCorrectly.find(p => p.clientID === clientID)) === undefined) {
+                    games[gameID].playersGuessedCorrectly.push(clientID);
+                    clients[clientID].connection.send(JSON.stringify({
+                        method: "correctGuess"
+                    }));
+                }
+
+            }
+            else {
+                games[gameID].clients.forEach(eachClient => { // it will be sent to all the clients apart from the one that sent it
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "message",
+                        messageSentBy: messageSentBy,
+                        messageContent: messageFromClient.messageContent
+                    }));
+                })
+            }
+
+
         }
 
 
@@ -387,24 +411,31 @@ function genThreeWords(gameID, listWordsAdded) {
 }
 
 function secondsFromNow(secondsToAdd) {
-    let now = Date().getTime();
-    return now.setSeconds(now.getSeconds() + secondsToAdd);
+    /*let now = new Date().getTime();
+    return now.setSeconds(now.getSeconds() + secondsToAdd);*/
+
+    let now = Date.now() // number of milliseconds since epoch
+    return now + (secondsToAdd * 1000);
 }
 
 function startPlaying(gameID, clientID) {
 
+    // current round is different to mini round
     if (games[gameID].currentRound === undefined) {
         // adds a current round property to game and initalises it to 1
         games[gameID].currentRound = 1;
     }
     else {
         // increments current round property
-        if(games[gameID].drawerPointer === 0)
-        games[gameID].currentRound += 1;
+        if (games[gameID].drawerPointer === 0)
+            games[gameID].currentRound += 1;
     }
 
     // adds/changes isRoundOver property to game
     games[gameID].isminiRoundOver = false;
+
+    // adds/changes isGuessing property to game
+    games[gameID].isGuessing = true;
 
 
     // adds/changes round finish time property to game
@@ -412,7 +443,7 @@ function startPlaying(gameID, clientID) {
     games[gameID].finishRoundBy = secondsFromNow(roundLength);
 
     // starts the round clock
-    clock = setInterval(checkTime(games[gameID].finishRoundBy, "round", gameID, clientID), 1000);
+    clock = setInterval(function () { checkTime(games[gameID].finishRoundBy, "round", gameID, clientID) }, 1000);
 
     // sends to all game clients to start the round
     games[gameID].clients.forEach(eachClient => {
@@ -431,9 +462,10 @@ function endGame(gameID) {
 
 // checks if all guessers have guessed correctly
 // if they have, the isRoundOver property of the game is changed
-function checkIfMiniRoundOver(gameID){
-    if(games[gameID].playersGuessedCorrectly.length === (games[gameID].playersInLobby.length - 1)){
+function checkIfMiniRoundOver(gameID) {
+    if (games[gameID].playersGuessedCorrectly.length === (games[gameID].playersInLobby.length - 1)) {
         games[gameID].isMiniRoundOver = true;
+        clearInterval(clock);
         miniRoundOver();
     }
     /*
@@ -469,37 +501,64 @@ function incrementDrawerPointer(gameID) {
 // is called when round is over so doesn't need to check if it is over
 function miniRoundOver(gameID, clientID) {
     // checks if game over and ends game if it is
-    
+
     if (checkIfGameOver(gameID)) {
         endGame(gameID);
         return;
     }
-    
+
+    // doesn't display normal mini round finish screen as an end game screen is displayed with the scores anyways
+
+    //send to all game clients
+    games[gameID].clients.forEach(eachClient => {
+        const client = clients[eachClient.clientID];
+
+
+        client.connection.send(JSON.stringify({
+            method: "roundOver",
+            playersAndScores: games[gameID].playersInLobby
+        }));
+
+    })
+
+    games[gameID].isGuessing = false;
+
     incrementDrawerPointer(gameID);
 
-    startMiniRound(gameID, clientID);
+    // start next round after 4 seconds
+    clock = setTimeout(startMiniRound(gameID, clientID), 4000);
 }
 
+//timeToCheck given in ms
 function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
+    /*
     const now = new Date().getTime();
     const difference = timeToCheck - now; // differrence is in milliseconds
     const secondsLeft = Math.floor((distance % (1000 * 60)) / 1000);
     // when the timer is up
+    */
+    const now = Date.now(); // in ms since epoch
+    const difference = timeToCheck - now;
+    const secondsLeft = Math.floor(difference / 1000);
+
     if (secondsLeft <= 0) {
         clearInterval(clock);
-        console.log("round finished");
-        
+        clock = undefined;
+        console.log("time is up for: " + typeOfTime);
+
         if (typeOfTime === "chooseWord") {
-            // as the drawer has chosen the word, the game can now start
-            startPlaying(gameID, clientID);
+            receiveWordChosen(gameID);
         }
         else if (typeOfTime === "round") {
-            roundOver(gameID, clientID);
+            miniRoundOver(gameID, clientID);
         }
-        
+        else {
+            console.log("type of time invalid");
+        }
+
     }
-    else{
-        checkIfMiniRoundOver();
+    else {
+        checkIfMiniRoundOver(gameID);
     }
 }
 
@@ -524,7 +583,14 @@ function startMiniRound(gameID, clientID) {
     games[gameID].chooseWordBy = secondsFromNow(secondsToChooseWord);
 
     const typeOfTime = "chooseWord";
-    clock = setInterval(checkTime(timeToCheck, typeOfTime, gameID, clientID), 1000); // checks per second
+
+    clock = setInterval(function () {
+        if (clock !== undefined) {
+            checkTime(games[gameID].chooseWordBy, typeOfTime, gameID, clientID)
+        }
+    }, 1000); // checks per second
+
+
 
     //////////////////////////////////////
     // assigning the variables to send to client:
@@ -562,9 +628,29 @@ function initialiseGame(gameID, clientID) {
 
     // adds a gameFinished property to game and initialises it to false
     games[gameID].gameFinished = false;
-    
+
     // adds a playersGuessedCorrectly list property and initialises it to be an empty list
     games[gameID].playersGuessedCorrectly = [];
 
+    // adding player score property and initialising them to 0
+    games[gameID].playersInLobby.forEach(eachPlayer => {
+        eachPlayer.playerScore = 0;
+    });
+
     startMiniRound(gameID, clientID);
+}
+
+function receiveWordChosen(gameID) {
+    const drawer = games[gameID].playersInLobby[games[gameID].drawerPointer];
+    const client = clients[drawer.clientID];
+    client.connection.send(JSON.stringify({
+        method: "sendWordChosen"
+    }));
+}
+
+function checkIfCorrectGuess(guess, gameID) {
+    if (guess === games[gameID].wordChosen) {
+        return true;
+    }
+    return false;
 }
