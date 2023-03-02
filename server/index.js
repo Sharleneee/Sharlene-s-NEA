@@ -286,10 +286,23 @@ wss.on("request", request => {
 
 
         if (messageFromClient.method === "wordChosen") {
+            const gameID = messageFromClient.gameID;
+            const wordChosen = messageFromClient.wordChosen;
 
-
-
+            // assings word chosen to the first word in the generated three words list
+            if (wordChosen === "") {
+                wordChosen = games[gameID].threeWords[0];
+            }
+            games[gameID].wordChosen = wordChosen;
+            startPlaying();
         }
+        /*
+        
+        if(messageFromClient.method === "checkIfRoundOver"){
+            const gameID = messageFromClient.gameID;
+            checkIfRoundOver(gameID);
+        }
+        */
 
         // if the data received is a message,
         if (messageFromClient.method === "message") {
@@ -378,16 +391,23 @@ function secondsFromNow(secondsToAdd) {
     return now.setSeconds(now.getSeconds() + secondsToAdd);
 }
 
-function startPlaying(gameID, clientID, wordChosen) {
+function startPlaying(gameID, clientID) {
 
     if (games[gameID].currentRound === undefined) {
         // adds a current round property to game and initalises it to 1
         games[gameID].currentRound = 1;
     }
-    // increments current round property
-    games[gameID].currentRound += 1;
+    else {
+        // increments current round property
+        if(games[gameID].drawerPointer === 0)
+        games[gameID].currentRound += 1;
+    }
 
-    // adds a round finish time property to game
+    // adds/changes isRoundOver property to game
+    games[gameID].isminiRoundOver = false;
+
+
+    // adds/changes round finish time property to game
     const roundLength = games[gameID].gameSettings.roundLength;
     games[gameID].finishRoundBy = secondsFromNow(roundLength);
 
@@ -399,7 +419,7 @@ function startPlaying(gameID, clientID, wordChosen) {
         const client = clients[eachClient.clientID];
         client.connection.send(JSON.stringify({
             method: "startPlaying",
-            wordChosen: wordChosen,
+            wordChosen: games[gameID].wordChosen,
             roundFinishTime: games[gameID].finishRoundBy
         }));
     });
@@ -407,6 +427,24 @@ function startPlaying(gameID, clientID, wordChosen) {
 
 function endGame(gameID) {
     // sets game finish property of game to true and sends message to everyone that game is finished along with the game end state
+}
+
+// checks if all guessers have guessed correctly
+// if they have, the isRoundOver property of the game is changed
+function checkIfMiniRoundOver(gameID){
+    if(games[gameID].playersGuessedCorrectly.length === (games[gameID].playersInLobby.length - 1)){
+        games[gameID].isMiniRoundOver = true;
+        miniRoundOver();
+    }
+    /*
+    games[gameID].clients.forEach(eachClient => {
+        const client = clients[eachClient.clientID];
+        client.connection.send(JSON.stringify({
+            method: "checkIfRoundOver",
+            isRoundOver: isRoundOver
+        }));
+    });
+    */
 }
 
 function checkIfGameOver(gameID) {
@@ -417,7 +455,7 @@ function checkIfGameOver(gameID) {
     return false;
 }
 
-function incrementDrawerPointer(gameID){
+function incrementDrawerPointer(gameID) {
     // circular array
     // checks if the drawer pointer is at the end of the list and sends it to the start
     if (games[gameID].drawerPointer === (games[gameID].playersInLobby.length - 1)) {
@@ -428,27 +466,18 @@ function incrementDrawerPointer(gameID){
     }
 }
 
-function roundOver(gameID, clientID) {
+// is called when round is over so doesn't need to check if it is over
+function miniRoundOver(gameID, clientID) {
     // checks if game over and ends game if it is
+    
     if (checkIfGameOver(gameID)) {
         endGame(gameID);
         return;
     }
-
+    
     incrementDrawerPointer(gameID);
 
-    const nextDrawer = games[gameID].playersInLobby[games[gameID].drawerPointer];
-
-    startRound(gameID, clientID);
-
-    // sends to all game clients  IDK IF WE NEED BELOW
-    games[gameID].clients.forEach(eachClient => {
-        const client = clients[eachClient.clientID];
-        client.connection.send(JSON.stringify({
-            method: "startRound",
-            nextDrawer: nextDrawer
-        }));
-    });
+    startMiniRound(gameID, clientID);
 }
 
 function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
@@ -458,6 +487,8 @@ function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
     // when the timer is up
     if (secondsLeft <= 0) {
         clearInterval(clock);
+        console.log("round finished");
+        
         if (typeOfTime === "chooseWord") {
             // as the drawer has chosen the word, the game can now start
             startPlaying(gameID, clientID);
@@ -465,21 +496,30 @@ function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
         else if (typeOfTime === "round") {
             roundOver(gameID, clientID);
         }
+        
+    }
+    else{
+        checkIfMiniRoundOver();
     }
 }
 
-function checkIfPlayerIsDrawer(gameID, clientID){
+function checkIfPlayerIsDrawer(gameID, clientID) {
     // if the client is not a drawer, this is indicated by the empty threeWordslist
     let threeWords = [];
+    const drawerPointer = games[gameID].drawerPointer;
 
-    if (games[gameID].playersInLobby[0].clientID === clientID) {
+    if (games[gameID].playersInLobby[drawerPointer].clientID === clientID) {
         threeWords = genThreeWords(gameID, games[gameID].gameSettings.listWordsAdded);
+        // creates a new property if game just started 
+        // assigns three words property to the three generated words
+        games[gameID].threeWords = threeWords;
     }
     return threeWords;
 }
 
-function startRound(gameID, clientID){
-    // adds the chooseWordBy time to the game object
+// this function enables drawer to start choosing word and updates the screens of the players for the round to start
+function startMiniRound(gameID, clientID) {
+    // adds the chooseWordBy time to the game object and sets it to the new time
     const secondsToChooseWord = 10;
     games[gameID].chooseWordBy = secondsFromNow(secondsToChooseWord);
 
@@ -491,14 +531,14 @@ function startRound(gameID, clientID){
 
     let isDrawer = false;
     const threeWords = checkIfPlayerIsDrawer(gameID, clientID);
-    if(threeWords.length === 3){
+    if (threeWords.length === 3) {
         isDrawer = true;
     }
 
     // empty object will be sent if it is not the first round 
     // as the player sets these settings to a variable on the first round so they can access it from there onwards
     let gameSettingsToSend = {};
-    if((games[gameID].currentRound === 1)&&(games[gameID].drawerPointer === 0)){
+    if ((games[gameID].currentRound === 1) && (games[gameID].drawerPointer === 0)) {
         gameSettingsToSend = {
             numRounds: games[gameID].gameSettings.numRounds,
             roundLength: games[gameID].gameSettings.roundLength,
@@ -506,23 +546,25 @@ function startRound(gameID, clientID){
     }
 
     clients[clientID].connection.send(JSON.stringify({
-        method: "startRound",
+        method: "startMiniRound",
         gameSettings: gameSettingsToSend,
         isDrawer: isDrawer,
         threeWords: threeWords,
         chooseWordBy: games[gameID].chooseWordBy
-
     }));
 }
 
 function initialiseGame(gameID, clientID) {
     // sends messsage to initialise game and start the first round after client's clientID updated
-    
+
     // adds a game drawer pointer to point to a player in playersInLobby
     games[gameID].drawerPointer = 0;
 
     // adds a gameFinished property to game and initialises it to false
     games[gameID].gameFinished = false;
+    
+    // adds a playersGuessedCorrectly list property and initialises it to be an empty list
+    games[gameID].playersGuessedCorrectly = [];
 
-    startRound(gameID, clientID);
+    startMiniRound(gameID, clientID);
 }
