@@ -1,3 +1,5 @@
+// const { text } = require("express");
+
 let ws = new WebSocket("ws://localhost:8080");
 
 const oldClientID = sessionStorage.getItem("clientID");
@@ -47,6 +49,11 @@ ws.onmessage = message => {
         }
     }
 
+    if (msg.method === "receiveWordChosen") {
+        sendWordChosen();
+
+    }
+
     if (msg.method === "startPlaying") {
         const wordChosen = msg.wordChosen;
         const roundFinishTime = msg.roundFinishTime;
@@ -67,10 +74,31 @@ ws.onmessage = message => {
     }
     */
 
-    if(msg.method === "")
+    if (msg.method === "roundOver") {
+        const playersAndScores = msg.playersAndScores;
+        updateLeaderboard(playersAndScores);
+        displayRoundOver();
+        if (isDrawer) {
+            clearInterval(timer);
+            isDrawer = false;
+            // removing event listeners so they can no longer draw
+            c.removeEventListener("mousedown", startdraw);
+            c.removeEventListener("touchstart", startdraw);
+    
+            c.removeEventListener("mousemove", moveDraw);
+            c.removeEventListener("touchmove", moveDraw);
+    
+            c.removeEventListener("mouseup", endDraw);
+            c.removeEventListener("touchend", endDraw);
+        }
+    }
 
     if (msg.method === "message") {
         displayMessage(msg);
+    }
+
+    if (msg.method === "correctGuess") {
+        displayCorrectGuessMessage();
     }
 
 
@@ -141,41 +169,54 @@ function displayMessage(message) {
     chat.appendChild(newDivElement); // inserting the div element into the chat div
 }
 
+function displayCorrectGuessMessage(){
+    const chat = document.getElementById("chat");
+
+    const newDivElement = document.createElement("div");
+    newDivElement.style.backgroundColor = "#a7d1ac";
+    newDivElement.style.outlineColor = "#2b8235";
+    newDivElement.style.outlineStyle = "solid";
+    newDivElement.style.outlineWidth = "1px";
+    newDivElement.style.borderRadius = "2px";
+    newDivElement.style.margin = "6px";
+
+    // for css : message.style.marginTop = "4px";
+    // for css : sendButton.style.marginTop = "4px";
+
+    const newPElement = document.createElement("p"); //making a new paragraph element
+    newPElement.style.margin = "2px";
+
+    const node = document.createTextNode("You have guessed correctly!");
+    newPElement.appendChild(node); // inserting the text into the paragraph element
+    newDivElement.appendChild(newPElement); // inserting the paragraph into the new div element
+    chat.appendChild(newDivElement); // inserting the div element into the chat div
+}
+
 /////////////////////////////////////////////////////////////////////////////////
 
 function startCountdown(endTime, countdownType) {
-    timer = setInterval(updateCountdown(endTime, countdownType), 1000);
+    timer = setInterval(function(){updateCountdown(endTime, countdownType)}, 1000);
 }
 
-function updateCountdown(endTime, countdownType) {
+function updateCountdown(endTime) {
+    /*
     const now = new Date().getTime();
     const difference = endTime - now; // differrence is in milliseconds
     const secondsLeft = Math.floor((distance % (1000 * 60)) / 1000);
+    */
+    const now = Date.now();
+    const difference = endTime - now;
+    const secondsLeft = Math.floor(difference / 1000);
 
     document.getElementById("countdown").innerHTML = secondsLeft;
     if (difference <= 0) {
         document.getElementById("countdown").innerHTML = "";
-        clearInterval(timer);
-        if (countdownType === "chooseWord") {
-            sendWordChosen();
-        }
-        else if (countdownType === "round") {
-            roundOver();
-        }
-    }
-    else {
-        //checkIfRoundOver();
-        //if round is over, ie. when all players have guessed correctly
-        if (isRoundOver) {
-            document.getElementById("countdown").innerHTML = "";
-            clearInterval(timer);
-            roundOver();
-        }
     }
 }
 
 // this function accepts 0 or 1 parameters
 function sendWordChosen() {
+    clearInterval(timer);
     let wordChosen = "";
     if (arguments.length === 0) {
         // drawer didn't choose word in time so empty string send so server chooses first one as default
@@ -192,11 +233,12 @@ function sendWordChosen() {
         ws.send(JSON.stringify({
             method: "wordChosen",
             wordChosen: wordChosen,
-            gameID: gameID
+            gameID: gameID,
+            clientID: clientID
         }));
     }
 }
-
+// can take one string or a list of strings
 function createInfoBoard(text) {
     /*
     const newDiv = document.createElement("div");
@@ -206,13 +248,37 @@ function createInfoBoard(text) {
 
     cContainer.appendChild(newDiv);
     */
+   /*
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.globalAlpha = 1;
+    */
 
-    ctx.font = "30px Arial";
+    const fontSize = "20px";
+
+    ctx.font = fontSize + " Arial";
     ctx.textAlign = "center";
-    ctx.fillText(text, canvasWidth / 2, canvasHeight / 2);
+
+    // arguments is a list of the parameters
+    if (arguments.length === 1) {
+        // if text is just a string
+        if (typeof text === "string") {
+            ctx.fillText(text, canvasWidth / 2, canvasHeight / 2);
+        }
+        // if text is not a string, so an array 
+        else {
+            let rowCounter = 5;
+            arguments[0].forEach(eachText => {
+                ctx.fillText(eachText, canvasWidth / 2, rowCounter);
+                rowCounter += fontSize;
+            })
+        }
+    }
+    else {
+        console.log("Error. Too many parameters");
+    }
+
 }
 
 function add3buttons(threeWords, element) {
@@ -255,13 +321,13 @@ function prepareGuesser() {
 function generateHiddenWord(wordChosenLength) {
     let hiddenWord = "";
     for (let i = 0; i < wordChosenLength; i++) {
-        hiddenWord += "_";
+        hiddenWord += "_ ";
     }
     return hiddenWord;
 }
 
 function startGuesserPlaying(wordChosenLength) {
-    document.getElementById("timer").setAttribute("hidden", "true");
+    document.getElementById("timer").setAttribute("hidden", "false");
     document.getElementById("wordToGuess").innerHTML = generateHiddenWord(wordChosenLength);
 
     clearCanvas();
@@ -295,28 +361,73 @@ function checkIfRoundOver(){
 }
 */
 
-function roundOver() {
-    if (isDrawer) {
-        isDrawer = false;
-        // removing event listeners so they can no longer draw
-        c.removeEventListener("mousedown", startdraw);
-        c.removeEventListener("touchstart", startdraw);
 
-        c.removeEventListener("mousemove", moveDraw);
-        c.removeEventListener("touchmove", moveDraw);
-
-        c.removeEventListener("mouseup", endDraw);
-        c.removeEventListener("touchend", endDraw);
+// sorts to descending order
+function sortLeaderBoardList(leaderboard) {
+    for (let i = 0; i < leaderboard.length; i++) {
+        let swapped = false;
+        for (let j = 0; j < leaderboard.length - i - 1; j++) {
+            if (leaderboard[i].playerScore < leaderboard[i + 1].playerScore) {
+                const temp = leaderboard[i];
+                leaderboard[i] = leaderboard[i + 1];
+                leaderboard[i + 1] = temp;
+                swapped = true;
+            }
+        }
+        if (!swapped) {
+            break;
+        }
     }
-    if (ws.readyState === 1) {
-        ws.send(JSON.stringify({
-            method: "roundOver",
-            gameID: gameID,
-            clientID: clientID,
-            pointsGained: pointsGained
-        }));
-    }
+}
 
+// sorts and displays leaderboard
+function updateLeaderboard(playersAndScores) {
+    const leaderboard = document.getElementById("leaderboard");
+    sortLeaderBoardList(playersAndScores);
+    leaderboard.innerHTML = "";
+    playersAndScores.forEach(eachPlayer => {
+        let iconNode = document.createElement("div");
+        iconNode.setAttribute("height", "250px");
+        iconNode.setAttribute("width", "250px");
+        iconNode.setAttribute("class", "iconPart");
+        iconNode.innerHTML = eachPlayer.playerName + ": " + eachPlayer.playerScore + "pts";
+
+        const imageRoot = "https://d2lawzz4zy243q.cloudfront.net/";
+
+        let bodyStyle = document.createElement("img");
+        bodyStyle.setAttribute("src", imageRoot + eachPlayer.iconObject.bodyStyle);
+        bodyStyle.setAttribute("height", "170px");
+        bodyStyle.setAttribute("width", "230px");
+        bodyStyle.setAttribute("id", "bodyStyle");
+        iconNode.appendChild(bodyStyle);
+
+        let eyeStyle = document.createElement("img");
+        eyeStyle.setAttribute("src", imageRoot + eachPlayer.iconObject.eyeStyle);
+        eyeStyle.setAttribute("height", "70px");
+        eyeStyle.setAttribute("width", "140px");
+        eyeStyle.setAttribute("id", "eyeStyle");
+        iconNode.appendChild(eyeStyle);
+
+        let mouthStyle = document.createElement("img");
+        mouthStyle.setAttribute("src", imageRoot + eachPlayer.iconObject.mouthStyle);
+        mouthStyle.setAttribute("height", "30px");
+        mouthStyle.setAttribute("width", "60px");
+        mouthStyle.setAttribute("id", "mouthStyle");
+        iconNode.appendChild(mouthStyle);
+
+
+        leaderboard.appendChild(iconNode);
+    });
+
+}
+
+//displays all scores onto canvas
+function displayRoundOver(leaderboardList) {
+    const textToDisplay = ["Scores"];
+    leaderboardList.forEach(eachPlayer => {
+        textToDisplay.push(eachPlayer.playerName + ": " + eachPlayer.playerScore);
+    });
+    createInfoBoard(textToDisplay);
 }
 
 /////////////////////////////////////////////////////////////////////////////////
