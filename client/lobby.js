@@ -56,10 +56,6 @@ ws.onmessage = message => {
         form["roundLength"].value = msg.roundLength;
     }
 
-    if(msg.method === "updateUseCustomWords"){ //only clients who didnt send the changeNumRounds method are sent this msg (ie. non hosts)
-        form["useCustomWords"].value = msg.useCustomWords;
-    }
-
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -74,6 +70,9 @@ if(!isHost){
 else{
     const node = document.createElement("input");
     node.setAttribute("type", "text");
+    node.setAttribute("height", "100px");
+    node.setAttribute("size", "40");
+    node.setAttribute("placeholder", "Enter custom words here, separated by commas");
     node.setAttribute("id", "listWordsAdded");
     node.style.overflow = "auto";
     
