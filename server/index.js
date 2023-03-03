@@ -36,10 +36,9 @@ function updateClientID(messageFromClient) {
 
 // functions ^^
 
-words = ["Stapler", "Desk", "Phone", "Paper", "Light", "Chair", "Notepad", "Binder", "Calculator", "Calendar", "Pens", "Pencils", "Notebook", "Book", "Chairs", "Chairs", "Thermos", "Glue", "Clipboard", "Paperclips", "Chocolate", "Secretary", "Work", "Paperwork", "Workload", "Employee", "Boredom", "Coffee", "Golf", "Laptop", "Sandcastle", "Monday", "Vanilla", "Bamboo", "Sneeze", "Scratch", "Celery", "Hammer", "Frog", "Tennis", "Pants", "Bridge", "Bubblegum", "Bucket", "Skiing", "Sledding", "Snowboarding", "Snowman", "Cream", "Waffle", "Pancakes", "Sundae", "beach", "Sunglasses", "Surfboard", "Watermelon", "Baseball", "Bat", "Ball", "Kiss", "Jellyfish", "Jelly", "Butterfly", "Spider", "Broom", "Spiderweb", "Mummy", "Candy", "Bays", "Squirrels", "Basketball", "Unicorn", "Newspaper", "Girl", "Boy"];
+words = ["stapler", "desk", "phone", "paper", "light", "chair", "notepad", "binder", "calculator", "calendar", "pens", "pencils", "notebook", "book", "chairs", "chairs", "thermos", "glue", "clipboard", "paperclips", "chocolate", "secretary", "work", "paperwork", "workload", "employee", "boredom", "coffee", "golf", "laptop", "sandcastle", "monday", "vanilla", "bamboo", "sneeze", "scratch", "celery", "hammer", "frog", "tennis", "pants", "bridge", "bubblegum", "bucket", "skiing", "sledding", "snowboarding", "snowman", "cream", "waffle", "pancakes", "sundae", "beach", "sunglasses", "surfboard", "watermelon", "baseball", "bat", "ball", "kiss", "jellyfish", "jelly", "butterfly", "spider", "broom", "spiderweb", "mummy", "candy", "bays", "squirrels", "basketball", "unicorn", "newspaper", "girl", "boy"];
 const http = require("http");
 const { start } = require("repl");
-// const { getuid } = require("process");
 const WebSocketServer = require("websocket").server;
 let connection = null;
 let clients = {};
@@ -280,15 +279,27 @@ wss.on("request", request => {
         /////////////////////////////////////////////////////////////////////////////////////
         if (messageFromClient.method === "updateClientIDGamepage") {
             updateClientID(messageFromClient);
-            initialiseGame(messageFromClient.gameID, messageFromClient.clientID);
+            const gameID = messageFromClient.gameID;
+
+            // changes/adds clientIDsUpdated to update how many people have been updated
+            if (games[gameID].clientIDsUpdated === undefined) {
+                games[gameID].clientIDsUpdated = 0;
+            }
+            games[gameID].clientIDsUpdated += 1;
+
+            // initialises game once last person's clientID has been updated
+            if (games[gameID].clientIDsUpdated === games[gameID].playersInLobby.length) {
+                initialiseGame(messageFromClient.gameID, messageFromClient.clientID);
+            }
         }
 
 
 
         if (messageFromClient.method === "wordChosen") {
             clearInterval(clock);
+            clock = undefined;
             const gameID = messageFromClient.gameID;
-            const wordChosen = messageFromClient.wordChosen;
+            let wordChosen = messageFromClient.wordChosen;
 
             // assings word chosen to the first word in the generated three words list
             if (wordChosen === "") {
@@ -315,14 +326,21 @@ wss.on("request", request => {
             const messageSentBy = games[gameID].clients.find(eachClient => eachClient.clientID === clientID).playerName;
 
             let isCorrectGuess = false;
+            const drawerClientID = games[gameID].playersInLobby[games[gameID].drawerPointer].clientID;
+            const isDrawer = clientID === drawerClientID;
 
             if (games[gameID].isGuessing) {
-                isCorrectGuess = checkIfCorrectGuess(messageFromClient.messageContent);
+                isCorrectGuess = checkIfCorrectGuess(messageFromClient.messageContent, gameID);
             }
+
 
             if (isCorrectGuess) {
                 //checking if player is already in guessed correctly list
-                if ((games[gameID].playersGuessedCorrectly.find(p => p.clientID === clientID)) === undefined) {
+                if (((games[gameID].playersGuessedCorrectly.find(p => p.clientID === clientID)) === undefined) && !isDrawer) {
+                    //adding points to playerScore property
+                    const player = games[gameID].playersInLobby.find(p => p.clientID === clientID);
+                    player.playerScore += getGainedPoints(gameID);
+
                     games[gameID].playersGuessedCorrectly.push(clientID);
                     clients[clientID].connection.send(JSON.stringify({
                         method: "correctGuess"
@@ -331,7 +349,7 @@ wss.on("request", request => {
 
             }
             else {
-                games[gameID].clients.forEach(eachClient => { // it will be sent to all the clients apart from the one that sent it
+                games[gameID].clients.forEach(eachClient => {
                     const client = clients[eachClient.clientID];
                     client.connection.send(JSON.stringify({
                         method: "message",
@@ -344,23 +362,121 @@ wss.on("request", request => {
 
         }
 
+        if (messageFromClient.method === "startDraw") {
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
 
-        /* not completed
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "startDraw",
+                        buttonSelected: messageFromClient.buttonSelected,
+                        penColour: messageFromClient.penColour,
+                        penSize: messageFromClient.penSize,
+                        xCoord: messageFromClient.xCoord,
+                        yCoord: messageFromClient.yCoord
+                    }));
+                }
 
-        if(messageFromClient.method === "draw"){
-            clients.forEach(eachClient => {
-                if(eachClient.connection !== connection){
-                    eachClient.send(JSON.stringify({
-                        method: "drawUpdate",
-                        game: {
-                            gameID: messageFromClient.messageContent.gameID
-                        }
+            })
+        }
+
+        if (messageFromClient.method === "moveDraw") {
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "moveDraw",
+                        xCoord: messageFromClient.xCoord,
+                        yCoord: messageFromClient.yCoord
+                    }));
+                }
+
+            })
+        }
+
+        if (messageFromClient.method === "endDraw") {
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "endDraw"
+                    }));
+                }
+
+            })
+        }
+
+        if(messageFromClient.method === "clearCanvas"){
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "clearCanvas"
                     }));
                 }
             })
         }
-        */
 
+        if(messageFromClient.method === "redoDraw"){
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "redoDraw"
+                    }));
+                }
+            })
+        }
+
+        if(messageFromClient.method === "undoDraw"){
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "undoDraw"
+                    }));
+                }
+            })
+        }
+
+        if(messageFromClient.method === "fillCanvas"){
+            const gameID = messageFromClient.gameID;
+            const clientID = messageFromClient.clientID;
+
+            games[gameID].clients.forEach(eachClient => {
+                //sent to all game clients apart form drawer
+                if (eachClient.clientID !== clientID) {
+                    const client = clients[eachClient.clientID];
+                    client.connection.send(JSON.stringify({
+                        method: "fillCanvas",
+                        penColour: messageFromClient.penColour
+                    }));
+                }
+            })
+        }
 
     });
 
@@ -443,7 +559,12 @@ function startPlaying(gameID, clientID) {
     games[gameID].finishRoundBy = secondsFromNow(roundLength);
 
     // starts the round clock
-    clock = setInterval(function () { checkTime(games[gameID].finishRoundBy, "round", gameID, clientID) }, 1000);
+    clock = setInterval(function () {
+        if (clock !== undefined) {
+            checkTime(games[gameID].finishRoundBy, "round", gameID, clientID);
+        }
+    }, 1000);
+
 
     // sends to all game clients to start the round
     games[gameID].clients.forEach(eachClient => {
@@ -451,13 +572,21 @@ function startPlaying(gameID, clientID) {
         client.connection.send(JSON.stringify({
             method: "startPlaying",
             wordChosen: games[gameID].wordChosen,
-            roundFinishTime: games[gameID].finishRoundBy
+            roundFinishTime: games[gameID].finishRoundBy,
+            roundNumber: games[gameID].currentRound
         }));
     });
 }
 
 function endGame(gameID) {
     // sets game finish property of game to true and sends message to everyone that game is finished along with the game end state
+    games[gameID].clients.forEach(eachClient => {
+        const client = clients[eachClient.clientID];
+        client.connection.send(JSON.stringify({
+            method: "gameOver",
+            playersAndScores: games[gameID].playersInLobby
+        }));
+    });
 }
 
 // checks if all guessers have guessed correctly
@@ -466,7 +595,8 @@ function checkIfMiniRoundOver(gameID) {
     if (games[gameID].playersGuessedCorrectly.length === (games[gameID].playersInLobby.length - 1)) {
         games[gameID].isMiniRoundOver = true;
         clearInterval(clock);
-        miniRoundOver();
+        clock = undefined;
+        miniRoundOver(gameID);
     }
     /*
     games[gameID].clients.forEach(eachClient => {
@@ -499,7 +629,11 @@ function incrementDrawerPointer(gameID) {
 }
 
 // is called when round is over so doesn't need to check if it is over
-function miniRoundOver(gameID, clientID) {
+function miniRoundOver(gameID) {
+    // adds drawer's points
+    games[gameID].playersInLobby[games[gameID].drawerPointer].playerScore += getGainedPoints(gameID, true);
+    games[gameID].isGuessing = false;
+
     // checks if game over and ends game if it is
 
     if (checkIfGameOver(gameID)) {
@@ -521,16 +655,21 @@ function miniRoundOver(gameID, clientID) {
 
     })
 
-    games[gameID].isGuessing = false;
-
     incrementDrawerPointer(gameID);
 
     // start next round after 4 seconds
-    clock = setTimeout(startMiniRound(gameID, clientID), 4000);
+    clock = setTimeout(function () {
+        if (clock !== undefined){
+            startMiniRound(gameID);
+            clearInterval(clock);
+            clock = undefined;
+        }
+    }
+        , 4000);
 }
 
 //timeToCheck given in ms
-function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
+function checkTime(timeToCheck, typeOfTime, gameID) {
     /*
     const now = new Date().getTime();
     const difference = timeToCheck - now; // differrence is in milliseconds
@@ -550,7 +689,7 @@ function checkTime(timeToCheck, typeOfTime, gameID, clientID) {
             receiveWordChosen(gameID);
         }
         else if (typeOfTime === "round") {
-            miniRoundOver(gameID, clientID);
+            miniRoundOver(gameID);
         }
         else {
             console.log("type of time invalid");
@@ -577,47 +716,45 @@ function checkIfPlayerIsDrawer(gameID, clientID) {
 }
 
 // this function enables drawer to start choosing word and updates the screens of the players for the round to start
-function startMiniRound(gameID, clientID) {
+function startMiniRound(gameID) {
     // adds the chooseWordBy time to the game object and sets it to the new time
     const secondsToChooseWord = 10;
     games[gameID].chooseWordBy = secondsFromNow(secondsToChooseWord);
 
-    const typeOfTime = "chooseWord";
-
     clock = setInterval(function () {
         if (clock !== undefined) {
-            checkTime(games[gameID].chooseWordBy, typeOfTime, gameID, clientID)
+            checkTime(games[gameID].chooseWordBy, "chooseWord", gameID)
         }
     }, 1000); // checks per second
-
-
 
     //////////////////////////////////////
     // assigning the variables to send to client:
 
-    let isDrawer = false;
-    const threeWords = checkIfPlayerIsDrawer(gameID, clientID);
-    if (threeWords.length === 3) {
-        isDrawer = true;
-    }
+    games[gameID].clients.forEach(eachClient => {
+        let isDrawer = false;
+        const threeWords = checkIfPlayerIsDrawer(gameID, eachClient.clientID);
+        if (threeWords.length === 3) {
+            isDrawer = true;
+        }
 
-    // empty object will be sent if it is not the first round 
-    // as the player sets these settings to a variable on the first round so they can access it from there onwards
-    let gameSettingsToSend = {};
-    if ((games[gameID].currentRound === 1) && (games[gameID].drawerPointer === 0)) {
-        gameSettingsToSend = {
-            numRounds: games[gameID].gameSettings.numRounds,
-            roundLength: games[gameID].gameSettings.roundLength,
-        };
-    }
+        // empty object will be sent if it is not the first round 
+        // as the player sets these settings to a variable on the first round so they can access it from there onwards
+        let gameSettingsToSend = {};
+        if ((games[gameID].currentRound === 1) && (games[gameID].drawerPointer === 0)) {
+            gameSettingsToSend = {
+                numRounds: games[gameID].gameSettings.numRounds,
+                roundLength: games[gameID].gameSettings.roundLength,
+            };
+        }
 
-    clients[clientID].connection.send(JSON.stringify({
-        method: "startMiniRound",
-        gameSettings: gameSettingsToSend,
-        isDrawer: isDrawer,
-        threeWords: threeWords,
-        chooseWordBy: games[gameID].chooseWordBy
-    }));
+        clients[eachClient.clientID].connection.send(JSON.stringify({
+            method: "startMiniRound",
+            gameSettings: gameSettingsToSend,
+            isDrawer: isDrawer,
+            threeWords: threeWords,
+            chooseWordBy: games[gameID].chooseWordBy
+        }));
+    })
 }
 
 function initialiseGame(gameID, clientID) {
@@ -653,4 +790,16 @@ function checkIfCorrectGuess(guess, gameID) {
         return true;
     }
     return false;
+}
+
+function getGainedPoints(gameID, isDrawer) {
+    //length of guessed players before player is added because this is called before they are added to the list
+    const lengthOfGuessedPlayers = games[gameID].playersGuessedCorrectly.length;
+
+    if (isDrawer) {
+        return (lengthOfGuessedPlayers * 30);
+    }
+    else {
+        return (250 - lengthOfGuessedPlayers * 20);
+    }
 }
