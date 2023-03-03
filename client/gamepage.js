@@ -35,21 +35,26 @@ ws.onmessage = message => {
 
     if (msg.method === "startMiniRound") {
         // game settings is not empty on the first round
-        if (msg.gameSettings !== {}) {
+        if (msg.gameSettings.length > 0) {
             gameSettings = msg.gameSettings;
             // only has numRounds and roundLength
+
+            // change numrounds display
+            document.getElementById("numRounds").innerHTML = gameSettings.numRounds;
         }
 
+
+
         if (msg.isDrawer === true) {
-            prepareDrawer(msg.threeWords, msg.chooseWordBy);
             isDrawer = true;
+            prepareDrawer(msg.threeWords, msg.chooseWordBy);
         }
         else {
             prepareGuesser();
         }
     }
 
-    if (msg.method === "receiveWordChosen") {
+    if (msg.method === "sendWordChosen") {
         sendWordChosen();
 
     }
@@ -58,6 +63,9 @@ ws.onmessage = message => {
         const wordChosen = msg.wordChosen;
         const roundFinishTime = msg.roundFinishTime;
         startCountdown(roundFinishTime, "round");
+
+        //changes round number on display
+        document.getElementById("roundNumber").innerHTML = msg.roundNumber;
 
         if (isDrawer) {
             startDrawerPlaying(wordChosen);
@@ -77,20 +85,56 @@ ws.onmessage = message => {
     if (msg.method === "roundOver") {
         const playersAndScores = msg.playersAndScores;
         updateLeaderboard(playersAndScores);
-        displayRoundOver();
+        displayRoundOver(playersAndScores);
         if (isDrawer) {
             clearInterval(timer);
+            timer = undefined;
             isDrawer = false;
             // removing event listeners so they can no longer draw
             c.removeEventListener("mousedown", startdraw);
             c.removeEventListener("touchstart", startdraw);
-    
+
             c.removeEventListener("mousemove", moveDraw);
             c.removeEventListener("touchmove", moveDraw);
-    
+
             c.removeEventListener("mouseup", endDraw);
             c.removeEventListener("touchend", endDraw);
+
+            const tools = document.getElementById("toolbox").childNodes;
+            for (let i = 0; i < tools.length; i++) {
+                tools[i].hidden = true;
+            }
+            document.getElementById("timer").setAttribute("hidden", "true");
         }
+        document.getElementById("wordToGuess").innerHTML = "";
+    }
+
+    if (msg.method === "startDraw") {
+        displayStartdraw(msg.buttonSelected, msg.penColour, msg.penSize, msg.xCoord, msg.yCoord);
+    }
+
+    if (msg.method === "moveDraw") {
+        displayMoveDraw(msg.xCoord, msg.yCoord);
+    }
+
+    if (msg.method === "endDraw") {
+        displayEndDraw();
+    }
+
+    if (msg.method === "clearCanvas") {
+        displayClearCanvas();
+    }
+
+    if (msg.method === "fillCanvas") {
+        displayFill(msg.penColour);
+    }
+
+    if (msg.method === "redoDraw") {
+        displayRedo();
+    }
+
+    if (msg.method === "undoDraw") {
+        displayUndo();
     }
 
     if (msg.method === "message") {
@@ -169,7 +213,7 @@ function displayMessage(message) {
     chat.appendChild(newDivElement); // inserting the div element into the chat div
 }
 
-function displayCorrectGuessMessage(){
+function displayCorrectGuessMessage() {
     const chat = document.getElementById("chat");
 
     const newDivElement = document.createElement("div");
@@ -195,7 +239,11 @@ function displayCorrectGuessMessage(){
 /////////////////////////////////////////////////////////////////////////////////
 
 function startCountdown(endTime, countdownType) {
-    timer = setInterval(function(){updateCountdown(endTime, countdownType)}, 1000);
+    timer = setInterval(function () {
+        if (timer !== undefined) {
+            updateCountdown(endTime, countdownType);
+        }
+    }, 1000);
 }
 
 function updateCountdown(endTime) {
@@ -215,8 +263,9 @@ function updateCountdown(endTime) {
 }
 
 // this function accepts 0 or 1 parameters
-function sendWordChosen() {
+function sendWordChosen(event) {
     clearInterval(timer);
+    timer = undefined;
     let wordChosen = "";
     if (arguments.length === 0) {
         // drawer didn't choose word in time so empty string send so server chooses first one as default
@@ -237,6 +286,9 @@ function sendWordChosen() {
             clientID: clientID
         }));
     }
+    if (isDrawer) {
+        document.getElementById("threeButtonsContainer").hidden = true;
+    }
 }
 // can take one string or a list of strings
 function createInfoBoard(text) {
@@ -248,12 +300,12 @@ function createInfoBoard(text) {
 
     cContainer.appendChild(newDiv);
     */
-   /*
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-    ctx.globalAlpha = 1;
-    */
+    /*
+     ctx.globalAlpha = 0.7;
+     ctx.fillStyle = "white";
+     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+     ctx.globalAlpha = 1;
+     */
 
     const fontSize = "20px";
 
@@ -281,13 +333,13 @@ function createInfoBoard(text) {
 
 }
 
-function add3buttons(threeWords, element) {
+function add3buttons(threeWords) {
     for (let i = 0; i < 3; i++) {
-        const newButton = document.createElement("button");
-        newButton.innerHTML = threeWords[i];
-        clearInterval(timer);
-        newButton.addEventListener("click", sendWordChosen(newButton.innerHTML));
-        element.appendChild(newButton);
+        const btnID = "btn" + (i + 1).toString();
+        const button = document.getElementById(btnID);
+        button.innerHTML = threeWords[i];
+
+        button.hidden = false;
     }
 }
 
@@ -297,13 +349,12 @@ function prepareDrawer(threeWords, endTime) {
 
     createInfoBoard("Choose a word to draw...");
 
-    //creating div to place words in 
+    add3buttons(threeWords);
 
-    const newDiv = document.createElement("div");
-    cContainer.after(newDiv);
-
-    add3buttons(threeWords, newDiv);
-    //add3buttons(threeWords, document.getElementById("infoBoard"));
+    const tools = document.getElementById("toolbox").childNodes;
+    for (let i = 0; i < tools.length; i++) {
+        tools[i].hidden = false;
+    }
 }
 
 // makes all the drawing tools hidden and makes a screen show up saying the drawer is choosing a word
@@ -474,13 +525,25 @@ function sliding(x) {
 }
 
 function clearCanvas() {
-    ctx.fillStyle = "#FFFFFF";
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     drawings = [];
     drawingsListTop = -1;
-    ctx.putImageData
+
+    if (ws.readyState === 1) {
+        ws.send(JSON.stringify({
+            method: "clearCanvas",
+            gameID: gameID,
+            clientID: clientID
+        }));
+    }
+}
+
+function displayClearCanvas() {
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    drawings = [];
+    drawingsListTop = -1;
 }
 
 function fill() {
@@ -491,6 +554,25 @@ function fill() {
     drawings.push(ctx.getImageData(0, 0, canvasWidth, canvasHeight));
     drawingsListTop += 1;
     console.log(drawings);
+
+    if (ws.readyState === 1) {
+        ws.send(JSON.stringify({
+            method: "fillCanvas",
+            gameID: gameID,
+            clientID: clientID,
+            penColour: penColour
+        }));
+    }
+}
+
+function displayFill(colour) {
+    penColour = colour;
+    ctx.fillStyle = penColour;
+    ctx.strokeStyle = penColour;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    drawings.push(ctx.getImageData(0, 0, canvasWidth, canvasHeight));
+    drawingsListTop += 1;
 }
 
 function undo() {
@@ -509,8 +591,36 @@ function undo() {
 
         clearCanvas();
     }
+
+    if (ws.readyState === 1) {
+        ws.send(JSON.stringify({
+            method: "undoDraw",
+            gameID: gameID,
+            clientID: clientID
+        }));
+    }
+
     return; // do nothing if top pointer is -1 or less
 
+}
+
+function displayUndo(){
+    if (drawingsListTop > 0) {
+        undoStack.push(drawings.pop());
+        drawingsListTop -= 1;
+        undoStackPointer += 1;
+        ctx.putImageData(drawings[drawingsListTop], 0, 0);
+
+    }
+    else if (drawingsListTop === 0) {
+        undoStack.push(drawings.pop());
+        drawingsListTop = -1;
+        undoStackPointer += 1;
+        drawings = [];
+
+        clearCanvas();
+    }
+    return;
 }
 
 function redo() {
@@ -519,11 +629,24 @@ function redo() {
         drawings.push(undoStack.pop());
         drawingsListTop += 1;
         undoStackPointer -= 1;
+
+        if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+                method: "redoDraw",
+                gameID: gameID,
+                clientID: clientID
+            }));
+        }
     }
     return;
 }
 
-
+function displayRedo() {
+    ctx.putImageData(undoStack[undoStackPointer], 0, 0);
+    drawings.push(undoStack.pop());
+    drawingsListTop += 1;
+    undoStackPointer -= 1;
+}
 
 function startdraw(event) {
     let x = event.clientX - c.offsetLeft; // offset makes it so that the line drawn is from where the mouse pointer is because without this, the line is offset
@@ -550,7 +673,7 @@ function startdraw(event) {
         ctx.strokeStyle = "#FFFFFF";
 
         ctx.beginPath();  // exact same as the above
-        ctx.arc(x, y, 0.5, 0, 2 * Math.PI);
+        ctx.arc(x, y, 0.5 * penSize, 0, 2 * Math.PI);
         ctx.fill();
 
         ctx.strokeStyle = "#FFFFFF";
@@ -558,11 +681,57 @@ function startdraw(event) {
         ctx.beginPath();
         ctx.moveTo(x, y);
     }
+    if (ws.readyState === 1) {
+        ws.send(JSON.stringify({
+            method: "startDraw",
+            gameID: gameID,
+            clientID: clientID,
+            buttonSelected: buttonSelected,
+            penColour: penColour,
+            penSize: penSize,
+            xCoord: x,
+            yCoord: y
+        }));
+    }
     event.preventDefault();
 }
 
+function displayStartdraw(button, colour, size, x, y) {
+    buttonSelected = button;
+    penColour = colour;
+    penSize = size;
 
+    ctx.lineWidth = penSize;
 
+    undoStack = [];
+    undoStackPointer = -1;
+
+    if (buttonSelected === "paintbrush") {
+        ctx.strokeStyle = penColour;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 0.5 * penSize, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.strokeStyle = penColour;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+
+    }
+    else if (buttonSelected === "eraser") {
+        ctx.strokeStyle = "#FFFFFF";
+
+        ctx.beginPath();  // exact same as the above
+        ctx.arc(x, y, 0.5 * penSize, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.strokeStyle = "#FFFFFF";
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    }
+}
 
 function moveDraw(event) {
     if (isDrawing) {
@@ -571,11 +740,25 @@ function moveDraw(event) {
         ctx.lineTo(x, y);
         ctx.stroke();
 
+        if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+                method: "moveDraw",
+                gameID: gameID,
+                clientID: clientID,
+                xCoord: x,
+                yCoord: y
+
+            }));
+        }
+
     }
     event.preventDefault();
 }
 
-
+function displayMoveDraw(x, y) {
+    ctx.lineTo(x, y);
+    ctx.stroke();
+}
 
 function endDraw(event) {
     if (isDrawing) {
@@ -585,10 +768,22 @@ function endDraw(event) {
 
         drawings.push(ctx.getImageData(0, 0, canvasWidth, canvasHeight));
         drawingsListTop += 1;
+
+        if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+                method: "endDraw",
+                gameID: gameID,
+                clientID: clientID
+            }));
+        }
     }
     event.preventDefault();
 }
 
+function displayEndDraw() {
+    ctx.stroke();
+    ctx.closePath();
 
-
-
+    drawings.push(ctx.getImageData(0, 0, canvasWidth, canvasHeight));
+    drawingsListTop += 1;
+}
