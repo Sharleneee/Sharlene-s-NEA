@@ -15,8 +15,20 @@
     <div id="leaderboard"></div>
 
     <div id="gameInfo">
-        <p>Seconds left: </p>
-        <p id="countdown"></p>
+        <div class="inLineInfo">
+            <p>Round </p>
+            <p id="roundNumber"></p>
+        </div>
+
+        <div class="inLineInfo">
+            <p id="timer">Seconds left: </p>
+            <p id="countdown"></p>
+        </div>
+
+        <div>
+            <p id="wordToGuess"></p>
+        </div>
+        
 
     </div>
     <div class="flex-page">
@@ -27,6 +39,11 @@
         <canvas id="canvas" style="border:1px solid #000000;">
        
         </canvas>
+    </div>
+    <div id="threeButtonsContainer">
+        <button id="btn1" onclick="sendWordChosen(this.innerHTML)" hidden>a</button>
+        <button id="btn2" onclick="sendWordChosen(this.innerHTML)" hidden>b</button>
+        <button id="btn3" onclick="sendWordChosen(this.innerHTML)" hidden>x</button>
     </div>
         
     <div id="toolbox">
@@ -144,8 +161,8 @@
         </div>-->
         
         <div>
-            <input id="messageBox" type="text" placeholder="Guess or message your friends...">
-            <button id="sendButton" onclick="sendMessageToServer()" enterkeyhint="send"> > </button>
+            <input id="messageBox" type="text" placeholder="Guess or message your friends..." enterkeyhint="enter">
+            <button id="sendButton" onclick="sendMessageToServer()"> > </button>
 
         </div>
     </div>
